@@ -1,0 +1,42 @@
+syntax = "proto3";
+package upload;
+
+option go_package = "./uploadpb";
+
+import "google/protobuf/timestamp.proto";
+
+// Server response command container
+message ServerResponse {
+
+  enum MessageType {
+    AUTHENTICATED = 0;
+    QUIT = 1;
+  }
+
+  MessageType type = 1;
+}
+
+// Client message container
+message ClientRequest {
+
+  enum RequestType {
+    REGISTER = 0;
+    PICTURE = 1;
+  }
+
+  RequestType type = 1;
+  bytes request = 2;
+}
+
+// Client registration command
+message Register {
+  string host = 1;
+  string ip = 2;
+  string user = 3;
+}
+
+// Client picture upload
+message Picture {
+  repeated bytes picture = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
