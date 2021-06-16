@@ -11,15 +11,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// Add any number of middlewares to execute before a route handler
-func useMiddleware(h http.HandlerFunc, middleware ...func(http.HandlerFunc) http.HandlerFunc) http.HandlerFunc {
-	for _, m := range middleware {
-		h = m(h)
-	}
-
-	return h
-}
-
 // An http basic auth middleware
 func basicAuth(credentials map[string]string) mux.MiddlewareFunc {
 
