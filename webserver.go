@@ -52,7 +52,7 @@ func (server *WebServer) setupRoutes() {
 	authMiddleware := basicAuth(creds)
 	server.router.Use(authMiddleware)
 	server.router.HandleFunc("/monitors", server.handleGetMonitors)
-	server.router.HandleFunc("/monitors/{address}", server.handleScreenshot)
+	server.router.HandleFunc("/monitors/{address}/{screen}", server.handleScreenshot)
 	server.router.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("./ui/build"))))
 }
 
@@ -67,12 +67,28 @@ func (server *WebServer) handleScreenshot(w http.ResponseWriter, r *http.Request
 	// Get address to retrieve screenshot for
 	vars := mux.Vars(r)
 	address := vars["address"]
+	screennum, converr := strconv.Atoi(vars["screen"])
+	if converr != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
 
 	// Get client connection for address
 	client := server.mserver.GetClient(address)
 
-	// Send image response
-	im := client.LatestUpload.GetImages()[0]
+	// Get list of images
+	images := client.LatestUpload.GetImages()
+
+	// Verify image index is valid
+	if screennum > len(images)-1 || screennum < 0 {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// Get requested image
+	im := images[screennum]
+
+	// Set headers and write image data
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Content-Length", strconv.Itoa(len(im)))
 	if _, err := w.Write(im); err != nil {
@@ -88,13 +104,15 @@ func (server *WebServer) handleGetMonitors(w http.ResponseWriter, r *http.Reques
 	// Get monitors from the monitor server
 	clients := server.mserver.GetClients()
 
-	// Convert to a list
+	// Convert to the format we want for json
 	monitors := []map[string]string{}
+
 	for _, client := range clients {
 		monitors = append(monitors, map[string]string{
-			"address": client.Address,
-			"user":    client.Register.GetUser(),
-			"host":    client.Register.GetHost(),
+			"address":     client.Address,
+			"user":        client.Register.GetUser(),
+			"host":        client.Register.GetHost(),
+			"screenCount": strconv.Itoa(len(client.LatestUpload.GetImages())),
 		})
 	}
 

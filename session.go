@@ -2,18 +2,20 @@ package goscreenmonit
 
 import (
 	"bytes"
-	"fmt"
+	"crypto/tls"
 	"image/png"
-	"log"
 	"math"
 	"net"
+	"os"
 	"time"
 
+	"github.com/kardianos/service"
 	"github.com/micaiahwallace/goscreenmonit/uploadpb"
 	"google.golang.org/protobuf/proto"
 )
 
 type Session struct {
+	logger       service.Logger
 	address      string
 	socket       net.Conn
 	quit         chan int
@@ -30,13 +32,15 @@ type Registration struct {
 }
 
 // Create a new session that automatically connects to the server
-func NewSession(address string, fps int, registration Registration) *Session {
+func NewSession(logger service.Logger, address string, fps int, registration Registration) *Session {
 
 	if fps <= 0 {
-		log.Panicln("FPS must be greater than 0")
+		logger.Errorf("FPS must be greater than 0")
+		os.Exit(1)
 	}
 
 	sess := &Session{
+		logger:       logger,
 		address:      address,
 		fps:          fps,
 		isRecording:  false,
@@ -50,11 +54,17 @@ func NewSession(address string, fps int, registration Registration) *Session {
 // Start a new session
 func (session *Session) Start(quit chan int) {
 	if session.running {
-		log.Println("Already started session.")
+		session.logger.Warning("Already started session.")
 	}
 	session.running = true
 	session.quit = quit
 	go session.connect()
+}
+
+// Stop the session
+func (session *Session) Stop() {
+	session.running = false
+	session.quit <- 0
 }
 
 // Start a retry loop to connect to the server
@@ -63,15 +73,21 @@ func (session *Session) connect() {
 	for {
 
 		// Dial out to server
-		conn, err := net.Dial("tcp4", session.address)
+		tlsconf := &tls.Config{
+
+			// @TODO: Fix security here
+			InsecureSkipVerify: true,
+		}
+		conn, err := tls.Dial("tcp4", session.address, tlsconf)
 		if err != nil {
-			log.Printf("Unable to connect to server, retry in 5 seconds: %v\n", err)
+			session.logger.Warningf("Unable to connect to server, retry in 5 seconds: %v\n", err)
 			time.Sleep(time.Second * 5)
 			continue
 		}
 
 		// store the connection
 		session.socket = conn
+		session.running = true
 
 		// register with the server
 		session.register()
@@ -84,7 +100,7 @@ func (session *Session) connect() {
 		for msgdata := range indata {
 			response := &uploadpb.ServerResponse{}
 			if err := proto.Unmarshal(msgdata, response); err != nil {
-				log.Printf("Server message process error: %v\n", err)
+				session.logger.Warningf("Server message process error: %v\n", err)
 				continue
 			}
 			session.processResponse(response)
@@ -92,7 +108,7 @@ func (session *Session) connect() {
 
 		// connection was closed
 		session.running = false
-		log.Println("Connection to server closed. Connecting in 3 seconds.")
+		session.logger.Warning("Connection to server closed. Connecting in 3 seconds.")
 		time.Sleep(time.Second * 3)
 	}
 }
@@ -103,12 +119,12 @@ func (session *Session) processResponse(response *uploadpb.ServerResponse) {
 
 	// Client is authenticated
 	case uploadpb.ServerResponse_AUTHENTICATED:
-		log.Println("Server registration successful, begin recording.")
+		session.logger.Info("Server registration successful, begin recording.")
 		go session.record()
 
 	// Client should quit now
 	case uploadpb.ServerResponse_QUIT:
-		log.Println("Quit command received, quitting now.")
+		session.logger.Info("Quit command received, quitting now.")
 		session.quit <- 0
 	}
 
@@ -124,7 +140,7 @@ func (session *Session) register() error {
 	}
 
 	// Send registration to server
-	log.Println("Registering with the server.")
+	session.logger.Info("Registering with the server.")
 	SendMessage(cmd, session.socket)
 	return nil
 }
@@ -134,7 +150,7 @@ func (session *Session) record() {
 
 	// Check recording status
 	if session.isRecording {
-		fmt.Println("Already started record session.")
+		session.logger.Warning("Already started record session.")
 		return
 	}
 
@@ -147,6 +163,7 @@ func (session *Session) record() {
 		// Ensure we are running still
 		if !session.running {
 			session.isRecording = false
+			session.logger.Warning("Cannot start, session not yet running.")
 			return
 		}
 
@@ -163,7 +180,7 @@ func (session *Session) record() {
 			img, err := CaptureScreen(i)
 			if err != nil {
 				time.Sleep(2 * time.Second)
-				log.Printf("Unable to capture screen: %v\n", err)
+				session.logger.Errorf("Unable to capture screen: %v\n", err)
 				continue
 			}
 
@@ -173,7 +190,7 @@ func (session *Session) record() {
 			encimg, encerr := EncodeImage(pngbuff.Bytes())
 			if encerr != nil {
 				time.Sleep(2 * time.Second)
-				log.Printf("Unable to encode bytes: %v\n", encerr)
+				session.logger.Errorf("Unable to encode bytes: %v\n", encerr)
 				continue
 			}
 
@@ -184,21 +201,20 @@ func (session *Session) record() {
 		// Create upload request
 		msg, err := CreateUpload(images)
 		if err != nil {
-			log.Printf("Unable to create upload request: %v\n", err)
+			session.logger.Errorf("Unable to create upload request: %v\n", err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
 
 		// Send image upload to server
 		if err := SendMessage(msg, session.socket); err != nil {
-			log.Printf("Unable to send upload request: %v\n", err)
+			session.logger.Errorf("Unable to send upload request: %v\n", err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
 
 		// Check if we need to wait for fps compliance
 		waitFor := session.getWaitTime()
-		// log.Printf("Waiting for %v ms\n", waitFor)
 		time.Sleep(waitFor)
 
 		// Set the last screenshot timestamp

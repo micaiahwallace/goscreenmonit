@@ -1,6 +1,7 @@
 package goscreenmonit
 
 import (
+	"crypto/tls"
 	"log"
 	"net"
 
@@ -16,18 +17,22 @@ type RegisteredClient struct {
 }
 
 type Server struct {
-	address string
-	running bool
-	quit    chan int
-	clients map[string]*RegisteredClient
+	address  string
+	certPath string
+	keyPath  string
+	running  bool
+	quit     chan int
+	clients  map[string]*RegisteredClient
 }
 
 // Create and start a new server
-func NewServer(address string) *Server {
+func NewServer(address, certPath, keyPath string) *Server {
 	server := &Server{
-		address: address,
-		running: false,
-		clients: make(map[string]*RegisteredClient),
+		address:  address,
+		certPath: certPath,
+		keyPath:  keyPath,
+		running:  false,
+		clients:  make(map[string]*RegisteredClient),
 	}
 	return server
 }
@@ -60,8 +65,17 @@ func (server *Server) GetClient(address string) *RegisteredClient {
 // Start listening on the address
 func (server *Server) listen() {
 
+	// Load tls keypair
+	cert, certerr := tls.LoadX509KeyPair(server.certPath, server.keyPath)
+	if certerr != nil {
+		log.Printf("Unable to load server keypair: %v\n", certerr)
+		server.quit <- 1
+		return
+	}
+	tlsconfig := &tls.Config{Certificates: []tls.Certificate{cert}}
+
 	// Create the socket listener
-	listener, err := net.Listen("tcp4", server.address)
+	listener, err := tls.Listen("tcp4", server.address, tlsconfig)
 	if err != nil {
 		log.Printf("Unable to start server: %v\n", err)
 		server.quit <- 1
