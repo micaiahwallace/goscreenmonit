@@ -21,7 +21,7 @@ message ClientRequest {
 
   enum RequestType {
     REGISTER = 0;
-    PICTURE = 1;
+    UPLOAD = 1;
   }
 
   RequestType type = 1;
@@ -31,12 +31,11 @@ message ClientRequest {
 // Client registration command
 message Register {
   string host = 1;
-  string ip = 2;
-  string user = 3;
+  string user = 2;
 }
 
-// Client picture upload
-message Picture {
-  repeated bytes picture = 1;
+// Client image upload
+message ImageUpload {
+  repeated bytes images = 1;
   google.protobuf.Timestamp timestamp = 2;
 }

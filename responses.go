@@ -1,4 +1,4 @@
-package main
+package goscreenmonit
 
 import (
 	"github.com/micaiahwallace/goscreenmonit/uploadpb"

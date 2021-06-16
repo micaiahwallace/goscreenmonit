@@ -1,4 +1,4 @@
-package main
+package goscreenmonit
 
 import (
 	"github.com/micaiahwallace/goscreenmonit/uploadpb"
@@ -27,12 +27,11 @@ func CreateRequest(reqtype uploadpb.ClientRequest_RequestType, message protorefl
 }
 
 // Create a registration message
-func CreateRegistration(host, ip, user string) ([]byte, error) {
+func CreateRegistration(host, user string) ([]byte, error) {
 
 	// Create registration command
 	regcmd := &uploadpb.Register{
 		Host: host,
-		Ip:   ip,
 		User: user,
 	}
 
@@ -43,11 +42,11 @@ func CreateRegistration(host, ip, user string) ([]byte, error) {
 func CreateUpload(images [][]byte) ([]byte, error) {
 
 	// create the message
-	msg := &uploadpb.Picture{
-		Picture:   images,
+	msg := &uploadpb.ImageUpload{
+		Images:    images,
 		Timestamp: timestamppb.Now(),
 	}
 
 	// Serialize data
-	return CreateRequest(uploadpb.ClientRequest_PICTURE, msg)
+	return CreateRequest(uploadpb.ClientRequest_UPLOAD, msg)
 }
