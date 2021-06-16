@@ -1,8 +1,8 @@
 package main
 
 import (
-	"flag"
 	"log"
+	"os"
 
 	"github.com/kardianos/service"
 )
@@ -12,8 +12,7 @@ var logger service.Logger
 func main() {
 
 	// Parse installation command
-	flag.Parse()
-	command := flag.Arg(0)
+	command := os.Args[1]
 
 	// Create the program instance
 	prg := &program{}
