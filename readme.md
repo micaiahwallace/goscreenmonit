@@ -1,0 +1,3 @@
+# Go Screen Monitor - Corporate Screen Monitor Software
+
+Go Screen Monitor is a remote screen monitoring solution to aid companies who need to remotely monitor employee screens. The software consists of a client agent and a server agent. The client agent is installed on every machine to be monitored, and the agent is installed on a centrally accessible server for the client agent as well as the end user who will be viewing the screens.

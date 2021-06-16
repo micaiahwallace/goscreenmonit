@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"os"
 
 	"github.com/kardianos/service"
 )
@@ -24,7 +23,6 @@ func main() {
 		Name:        "GoScMonit",
 		DisplayName: "Go Screen Monitor",
 		Description: "Remotely provide screen support for enrolled devices.",
-		Arguments:   os.Args[2:],
 	}
 
 	// Test if not in interactive mode to see if run from process manager
@@ -35,7 +33,7 @@ func main() {
 
 	switch command {
 	case "install":
-		log.Println("Installing service.", os.Args[2:])
+		log.Println("Installing service.")
 		installService(prg, svcConfig)
 
 	case "uninstall":
@@ -52,6 +50,9 @@ func main() {
 
 	case "status":
 		log.Printf("Status: %v\n", serviceStatus(prg, svcConfig))
+
+	default:
+		runService(prg, svcConfig)
 	}
 
 }
