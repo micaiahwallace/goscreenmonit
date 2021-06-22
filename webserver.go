@@ -3,11 +3,14 @@ package goscreenmonit
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path"
 	"strconv"
 
+	"github.com/gobwas/ws"
+	"github.com/gobwas/ws/wsutil"
 	"github.com/gorilla/mux"
 )
 
@@ -51,15 +54,11 @@ func (server *WebServer) setupRoutes() {
 	server.router = mux.NewRouter()
 	authMiddleware := basicAuth(creds)
 	server.router.Use(authMiddleware)
+	server.router.HandleFunc("/ws", server.handleWebsocket)
 	server.router.HandleFunc("/monitors", server.handleGetMonitors)
 	server.router.HandleFunc("/monitors/{address}/{screen}", server.handleScreenshot)
 	server.router.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("./ui/build"))))
 }
-
-// Handle requests to main viewing page
-// func (server *WebServer) handleMain(w http.ResponseWriter, r *http.Request) {
-// 	http.ServeFile(w, r, "./ui/server/index.html")
-// }
 
 // Handle retreiving screenshots
 func (server *WebServer) handleScreenshot(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +97,7 @@ func (server *WebServer) handleScreenshot(w http.ResponseWriter, r *http.Request
 
 	// Write image data to http response
 	if _, err := w.Write(im); err != nil {
-		log.Println("unable to write image.")
+		log.Printf("unable to write image. %v\n", err)
 		http.Error(w, "Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -126,4 +125,63 @@ func (server *WebServer) handleGetMonitors(w http.ResponseWriter, r *http.Reques
 	if err := json.NewEncoder(w).Encode(monitors); err != nil {
 		http.Error(w, "Server Error", 500)
 	}
+}
+
+// Handle websocket connections
+func (server *WebServer) handleWebsocket(w http.ResponseWriter, r *http.Request) {
+
+	// Upgrade request to a websocket
+	conn, _, _, err := ws.UpgradeHTTP(r, w)
+	if err != nil {
+		http.Error(w, "Upgrade Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Handle websocket messaging
+	var (
+		wr      = wsutil.NewReader(conn, ws.StateServerSide)
+		ww      = wsutil.NewWriter(conn, ws.StateServerSide, ws.OpText)
+		decoder = json.NewDecoder(wr)
+		encoder = json.NewEncoder(ww)
+	)
+	go func(conn net.Conn) {
+		defer conn.Close()
+
+		// Process messages until closed or errored
+		for {
+
+			// Get the next frame header data
+			hdr, err := wr.NextFrame()
+			if err != nil {
+				log.Println("unable to get ws client headers")
+				return
+			}
+
+			// Test if header sent a close request
+			if hdr.OpCode == ws.OpClose {
+				log.Println("ws close request received")
+				return
+			}
+
+			// Receive json request from client
+			var req map[string]string
+			if err := decoder.Decode(&req); err != nil {
+				log.Printf("decode request error: %v\n", err)
+				return
+			}
+
+			// Send json response to client
+			resp := map[string]string{"status": "ok"}
+			if err := encoder.Encode(&resp); err != nil {
+				log.Printf("unable to encode response data onto ws writer. %v\n", err)
+				return
+			}
+
+			// Flush data to websocket and send fin
+			if err = ww.Flush(); err != nil {
+				log.Printf("unable to flush ws message to underlying writer. %v\n", err)
+				return
+			}
+		}
+	}(conn)
 }

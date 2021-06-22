@@ -1,6 +1,10 @@
-# Go Screen Monitor - Screen Monitor Software
+# GoScreenMonit 
 
-Go Screen Monitor allows a remotely installed service to capture screenshots at a specified framerate for any logged in user and provide remote access to them via the web interface.
+**Warning !! project in early development !!**
+
+Go Screen Monitor captures screenshots of a logged in user and sends them off to a monitor server.
+
+Screenshots can be viewed by logging in to the web server and selecting a connected agent.
 
 ## Sample
 
