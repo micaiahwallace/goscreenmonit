@@ -8,9 +8,25 @@ The client and server are both located in the cmd directory. Use go build to cre
 
 ## Server
 
-To run the server, copy the `credentials.json.sample` to `credentials.json` in the same directory as the built executable, then modify to add user logins. To run the server, use the following:
+To run the server, do the following:
+1. copy the `credentials.json.sample` to `credentials.json` in the same directory as the built executable, then modify to add user logins. 
+2. run `genkeypair.sh` to generate a tls key pair used for the web server and for agent to server communication.
+3. ensure you have a recent version of nodejs installed then run `npm run build` inside the ui directory.
+4. before running, ensure you have the following directory structure setup:
+
+```
+/goscreenmonit        (root project directory)
+  - smserver          (server binary built with `go build ./cmd/smserver`)
+  - server.key        (tls key file)
+  - server.crt        (tls certificate file)
+  - credentials.json  (web server authentication credentials)
+  - ui                (ui source directory)
+    - build           (directory of the built ui source files)
+```
+
+To run the server, use the following:
 ```shell
-smserver.exe -mserver :3000 -wserver :8080
+$ ./smserver -mserver :3000 -wserver :8080
 ```
 
 ## Client
