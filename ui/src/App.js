@@ -6,14 +6,17 @@ function App() {
 
   const [mons, setMons] = useState([])
   const [selected, setSelected] = useState(null);
-  const [update, setUpdate] = useState(0);
+  const [update, setUpdate] = useState(1);
 
   // Load monitors on initial load
   useEffect(() => {
-    request("/monitors")
-    .then(resp => {
-      setMons(resp.data)
-    })
+    const interval = setInterval(() => {
+      request("/monitors")
+      .then(resp => {
+        setMons(resp.data)
+      })
+    }, 2000)
+    return () => clearInterval(interval)
   }, []);
 
   // Update selected monitor
@@ -25,8 +28,10 @@ function App() {
   // update active screenshot
   useEffect(() => {
     if (selected) {
-      const timer = setInterval(() => setUpdate(u => u + 1), 100);
-      return () => clearInterval(timer)
+      // Toggle update increment between 1 and 2 instead of
+      // incrementing indefinitely to avoid it running to Infinity
+      const interval = setInterval(() => setUpdate(u => u == 1 ? 2 : 1), 950);
+      return () => clearInterval(interval)
     }
   }, [selected]);
 
@@ -44,11 +49,11 @@ function App() {
   }
 
   // Generate image width
-  const imWidth = selected ? Math.min(Math.max(100 / (selected.screenCount), 50), 35) : 50;
+  const imWidth = selected ? Math.min(Math.max(100 / selected.screenCount, 50), 35) : 50;
 
   return (
     <div>
-      <h1>S1 Monitor</h1>
+      <h1>Go Screen Monit</h1>
       <ul>
         {mons.map(mon => (
           <li key={mon.address}><a href="#" onClick={setMon.bind(null, mon.address)}>{mon.user} ({mon.host} - {mon.address})</a></li>
