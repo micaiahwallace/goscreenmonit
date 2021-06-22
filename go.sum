@@ -18,8 +18,6 @@ github.com/kbinani/screenshot v0.0.0-20210326165202-b96eb3309bb0 h1:lICR2wyk9J6T
 github.com/kbinani/screenshot v0.0.0-20210326165202-b96eb3309bb0/go.mod h1:ZceVWGtzUZmxyN+/1I+oG31oOm1dOA2QUNbua9TLVdE=
 github.com/lxn/win v0.0.0-20210218163916-a377121e959e h1:H+t6A/QJMbhCSEH5rAuRxh+CtW96g0Or0Fxa9IKr4uc=
 github.com/lxn/win v0.0.0-20210218163916-a377121e959e/go.mod h1:KxxjdtRkfNoYDCUP5ryK7XJJNTnpC8atvtmTheChOtk=
-github.com/micaiahwallace/gowatchprog v0.0.0-20210620041548-2c84df17b4e0 h1:x7MJBiM+vos9HtgMaHt7OVUKji1PS2kq8D7MZg7KhuU=
-github.com/micaiahwallace/gowatchprog v0.0.0-20210620041548-2c84df17b4e0/go.mod h1:ZthYtkO2tyhuwbnrfNO/3NEHwfZK2c657E51S9deRnQ=
 github.com/micaiahwallace/gowatchprog v0.0.0-20210622045044-519156bced13 h1:p9dCyK6KVZ4sFfHbr9+4BDHC0DbFrvDo1pDeaa7XBzw=
 github.com/micaiahwallace/gowatchprog v0.0.0-20210622045044-519156bced13/go.mod h1:ZthYtkO2tyhuwbnrfNO/3NEHwfZK2c657E51S9deRnQ=
 github.com/mitchellh/go-ps v1.0.0 h1:i6ampVEEF4wQFF+bkYfwYgY+F/uYJDktmvLPf7qIgjc=
