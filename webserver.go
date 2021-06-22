@@ -171,7 +171,7 @@ func (server *WebServer) handleWebsocket(w http.ResponseWriter, r *http.Request)
 
 			// Verify image index is valid
 			if screennum > len(images)-1 || screennum < 0 {
-				http.Error(w, "Bad Request", http.StatusBadRequest)
+				log.Printf("invalid screen number: %d\n", screennum)
 				return
 			}
 
