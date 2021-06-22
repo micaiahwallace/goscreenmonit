@@ -75,6 +75,10 @@ func (server *WebServer) handleScreenshot(w http.ResponseWriter, r *http.Request
 
 	// Get client connection for address
 	client := server.mserver.GetClient(address)
+	if client == nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
 
 	// Get list of images
 	images := client.LatestUpload.GetImages()
@@ -88,9 +92,11 @@ func (server *WebServer) handleScreenshot(w http.ResponseWriter, r *http.Request
 	// Get requested image
 	im := images[screennum]
 
-	// Set headers and write image data
+	// Set image headers
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Content-Length", strconv.Itoa(len(im)))
+
+	// Write image data to http response
 	if _, err := w.Write(im); err != nil {
 		log.Println("unable to write image.")
 		http.Error(w, "Server Error", http.StatusInternalServerError)

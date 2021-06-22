@@ -7,37 +7,11 @@ import (
 	"os/user"
 	"strconv"
 
-	"github.com/kardianos/service"
 	"github.com/micaiahwallace/goscreenmonit"
 )
 
-type program struct {
-	session *goscreenmonit.Session
-}
-
-// Handle starting the service
-func (p *program) Start(s service.Service) error {
-
-	// Get logger for service
-	logger, err := s.Logger(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Start program
-	go p.run(logger)
-
-	return nil
-}
-
-// Handle stopping the service
-func (p *program) Stop(s service.Service) error {
-	p.session.Stop()
-	return nil
-}
-
 // Start running the program
-func (p *program) run(logger service.Logger) {
+func run() {
 
 	// Parse cli arguments
 	var server, fpsStr string
@@ -48,37 +22,35 @@ func (p *program) run(logger service.Logger) {
 	// Get framerate int
 	fps, fpserr := strconv.Atoi(fpsStr)
 	if fpserr != nil {
-		logger.Error("Please specify a valid numeric fps value")
-		os.Exit(1)
+		log.Fatalln("Please specify a valid numeric fps value")
 	}
 
 	// Log current settings
-	logger.Info("Current configuration:")
-	logger.Infof("FPS: %v\n", fpsStr)
-	logger.Infof("Server: %v\n", server)
+	log.Println("Current configuration:")
+	log.Printf("FPS: %v\n", fpsStr)
+	log.Printf("Server: %v\n", server)
 
 	// Get system information
 	hostName, userName, syserr := getSysInfo()
 	if syserr != nil {
-		logger.Errorf("System information cannot be retreived: %v\n", syserr)
-		os.Exit(1)
+		log.Fatalf("System information cannot be retreived: %v\n", syserr)
 	}
 
+	// Create server registration data
 	registration := goscreenmonit.Registration{
 		Host: hostName,
 		User: userName,
 	}
 
 	// Create and start a new session
-	session := goscreenmonit.NewSession(logger, server, fps, registration)
+	session := goscreenmonit.NewSession(server, fps, registration)
 	quit := make(chan int)
 	session.Start(quit)
-	logger.Info("Client agent running.")
-	p.session = session
+	log.Println("Client agent running.")
 
 	// Check for quit signal
 	code := <-quit
-	logger.Infof("Received quit signal: %d\n", code)
+	log.Printf("Received quit signal: %d\n", code)
 	os.Exit(code)
 }
 
