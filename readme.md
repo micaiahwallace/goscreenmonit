@@ -28,3 +28,11 @@ smclient.exe install watch -server 192.168.1.5:3000 -fps 5
 ```
 
 This will install a watchdog service that will run on every subsequent user login with the specified parameters.
+
+## Todo
+
+- [ ] Increase security validation between agent and server
+- [ ] Provide a better authentication mechanism
+- [ ] Clean up the POC user interface
+- [ ] Increase data transmission efficiency from web server to UI
+- [ ] Look into a more efficient screen capture option
