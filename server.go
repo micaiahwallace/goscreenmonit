@@ -2,6 +2,7 @@ package goscreenmonit
 
 import (
 	"crypto/tls"
+	"errors"
 	"log"
 	"net"
 
@@ -14,6 +15,7 @@ type RegisteredClient struct {
 	Conn         net.Conn
 	Register     *uploadpb.Register
 	LatestUpload *uploadpb.ImageUpload
+	Listeners    []*func()
 }
 
 type Server struct {
@@ -60,6 +62,31 @@ func (server *Server) GetClient(address string) *RegisteredClient {
 		return nil
 	}
 	return client
+}
+
+// Register a listener for client image updates
+func (server *Server) AddClientListener(address string, ln *func()) error {
+	client, ok := server.clients[address]
+	if !ok {
+		return errors.New("client doesn't exist")
+	}
+	client.Listeners = append(client.Listeners, ln)
+	return nil
+}
+
+// Remove a registered listener to cleanup
+func (server *Server) RemoveClientListener(address string, ln *func()) error {
+	client, ok := server.clients[address]
+	if !ok {
+		return errors.New("client doesn't exist")
+	}
+	for i, listener := range client.Listeners {
+		if listener == ln {
+			client.Listeners = append(client.Listeners[:i], client.Listeners[i+1:]...)
+			break
+		}
+	}
+	return nil
 }
 
 // Start listening on the address
@@ -153,9 +180,10 @@ func (server *Server) register(req *uploadpb.Register, conn net.Conn) {
 	// Add connection to registered clients
 	log.Printf("Registering client: (%s) %s\n", req.GetUser(), address)
 	server.clients[address] = &RegisteredClient{
-		Address:  address,
-		Conn:     conn,
-		Register: req,
+		Address:   address,
+		Conn:      conn,
+		Register:  req,
+		Listeners: make([]*func(), 0),
 	}
 
 	// Send auth response
@@ -216,4 +244,9 @@ func (server *Server) uploadImages(req *uploadpb.ImageUpload, conn net.Conn) {
 
 	// Store image for later retrieval
 	client.LatestUpload = req
+
+	// Notify listeners of latest image
+	for _, listener := range client.Listeners {
+		(*listener)()
+	}
 }

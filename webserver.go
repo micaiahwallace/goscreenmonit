@@ -54,54 +54,54 @@ func (server *WebServer) setupRoutes() {
 	server.router = mux.NewRouter()
 	authMiddleware := basicAuth(creds)
 	server.router.Use(authMiddleware)
-	server.router.HandleFunc("/ws", server.handleWebsocket)
 	server.router.HandleFunc("/monitors", server.handleGetMonitors)
-	server.router.HandleFunc("/monitors/{address}/{screen}", server.handleScreenshot)
+	server.router.HandleFunc("/ws/{address}/{screen}", server.handleWebsocket)
+	// server.router.HandleFunc("/monitors/{address}/{screen}", server.handleScreenshot)
 	server.router.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("./ui/build"))))
 }
 
 // Handle retreiving screenshots
-func (server *WebServer) handleScreenshot(w http.ResponseWriter, r *http.Request) {
+// func (server *WebServer) handleScreenshot(w http.ResponseWriter, r *http.Request) {
 
-	// Get address to retrieve screenshot for
-	vars := mux.Vars(r)
-	address := vars["address"]
-	screennum, converr := strconv.Atoi(vars["screen"])
-	if converr != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
+// 	// Get address to retrieve screenshot for
+// 	vars := mux.Vars(r)
+// 	address := vars["address"]
+// 	screennum, converr := strconv.Atoi(vars["screen"])
+// 	if converr != nil {
+// 		http.Error(w, "Bad Request", http.StatusBadRequest)
+// 		return
+// 	}
 
-	// Get client connection for address
-	client := server.mserver.GetClient(address)
-	if client == nil {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
+// 	// Get client connection for address
+// 	client := server.mserver.GetClient(address)
+// 	if client == nil {
+// 		http.Error(w, "Not Found", http.StatusNotFound)
+// 		return
+// 	}
 
-	// Get list of images
-	images := client.LatestUpload.GetImages()
+// 	// Get list of images
+// 	images := client.LatestUpload.GetImages()
 
-	// Verify image index is valid
-	if screennum > len(images)-1 || screennum < 0 {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
+// 	// Verify image index is valid
+// 	if screennum > len(images)-1 || screennum < 0 {
+// 		http.Error(w, "Bad Request", http.StatusBadRequest)
+// 		return
+// 	}
 
-	// Get requested image
-	im := images[screennum]
+// 	// Get requested image
+// 	im := images[screennum]
 
-	// Set image headers
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Content-Length", strconv.Itoa(len(im)))
+// 	// Set image headers
+// 	w.Header().Set("Content-Type", "image/png")
+// 	w.Header().Set("Content-Length", strconv.Itoa(len(im)))
 
-	// Write image data to http response
-	if _, err := w.Write(im); err != nil {
-		log.Printf("unable to write image. %v\n", err)
-		http.Error(w, "Server Error", http.StatusInternalServerError)
-		return
-	}
-}
+// 	// Write image data to http response
+// 	if _, err := w.Write(im); err != nil {
+// 		log.Printf("unable to write image. %v\n", err)
+// 		http.Error(w, "Server Error", http.StatusInternalServerError)
+// 		return
+// 	}
+// }
 
 // Handle retreiving a list of available monitors
 func (server *WebServer) handleGetMonitors(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +130,29 @@ func (server *WebServer) handleGetMonitors(w http.ResponseWriter, r *http.Reques
 // Handle websocket connections
 func (server *WebServer) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 
+	// Get address to retrieve screenshot for
+	vars := mux.Vars(r)
+	address := vars["address"]
+	screennum, converr := strconv.Atoi(vars["screen"])
+	if converr != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// Get basic auth user and pass
+	authUser, _, ok := r.BasicAuth()
+	if !ok {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// Get client connection for address
+	client := server.mserver.GetClient(address)
+	if client == nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
 	// Upgrade request to a websocket
 	conn, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
@@ -137,49 +160,49 @@ func (server *WebServer) handleWebsocket(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Handle websocket messaging
-	var (
-		wr      = wsutil.NewReader(conn, ws.StateServerSide)
-		ww      = wsutil.NewWriter(conn, ws.StateServerSide, ws.OpText)
-		decoder = json.NewDecoder(wr)
-		encoder = json.NewEncoder(ww)
-	)
+	// Handle sending images to client
 	go func(conn net.Conn) {
-		defer conn.Close()
 
-		// Process messages until closed or errored
+		// Handle image updates from the client
+		handler := func() {
+
+			// Get list of images
+			images := client.LatestUpload.GetImages()
+
+			// Verify image index is valid
+			if screennum > len(images)-1 || screennum < 0 {
+				http.Error(w, "Bad Request", http.StatusBadRequest)
+				return
+			}
+
+			// Send requested image to websocket
+			im := images[screennum]
+			if err := wsutil.WriteServerBinary(conn, im); err != nil {
+				log.Printf("Unable to write server binary: %v\n", err)
+			}
+		}
+
+		// Cleanup after function ends
+		defer func() {
+			conn.Close()
+			if err := server.mserver.RemoveClientListener(address, &handler); err != nil {
+				log.Printf("Unable to remove listener: %v (%s->%s)\n", err, client.Register.GetUser(), client.Address)
+			} else {
+				log.Printf("Removed listener for user %s to %s -> %s\n", authUser, client.Register.GetUser(), client.Address)
+			}
+		}()
+
+		// Add client listener
+		if err := server.mserver.AddClientListener(address, &handler); err != nil {
+			log.Printf("Unable to add client listener: %v\n", err)
+		} else {
+			log.Printf("Added listener for %s to %s -> %s\n", authUser, client.Register.GetUser(), client.Address)
+		}
+
+		// Listen for client messages
 		for {
-
-			// Get the next frame header data
-			hdr, err := wr.NextFrame()
+			_, _, err := wsutil.ReadClientData(conn)
 			if err != nil {
-				log.Println("unable to get ws client headers")
-				return
-			}
-
-			// Test if header sent a close request
-			if hdr.OpCode == ws.OpClose {
-				log.Println("ws close request received")
-				return
-			}
-
-			// Receive json request from client
-			var req map[string]string
-			if err := decoder.Decode(&req); err != nil {
-				log.Printf("decode request error: %v\n", err)
-				return
-			}
-
-			// Send json response to client
-			resp := map[string]string{"status": "ok"}
-			if err := encoder.Encode(&resp); err != nil {
-				log.Printf("unable to encode response data onto ws writer. %v\n", err)
-				return
-			}
-
-			// Flush data to websocket and send fin
-			if err = ww.Flush(); err != nil {
-				log.Printf("unable to flush ws message to underlying writer. %v\n", err)
 				return
 			}
 		}

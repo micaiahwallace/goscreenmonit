@@ -1,6 +1,6 @@
 # GoScreenMonit 
 
-**Warning !! project in early development !!**
+## **Project Status**: ⚠️ early development
 
 Go Screen Monitor captures screenshots of a logged in user and sends them off to a monitor server.
 

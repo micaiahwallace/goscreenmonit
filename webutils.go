@@ -1,7 +1,6 @@
 package goscreenmonit
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -29,29 +28,22 @@ func basicAuth(credentials map[string]string) mux.MiddlewareFunc {
 				return
 			}
 
-			// Decode the user:pass base64 encoded string
-			b, err := base64.StdEncoding.DecodeString(s[1])
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusUnauthorized)
-				return
-			}
-
-			// Separate the username and password
-			pair := strings.SplitN(string(b), ":", 2)
-			if len(pair) != 2 {
+			// Get basic auth user and pass
+			sentUser, sentPass, ok := r.BasicAuth()
+			if !ok {
 				http.Error(w, "Not authorized", http.StatusUnauthorized)
 				return
 			}
 
 			// Check for credential set
-			userPass, ok := credentials[pair[0]]
+			userPass, ok := credentials[sentUser]
 			if !ok {
 				http.Error(w, "Not authorized", http.StatusUnauthorized)
 				return
 			}
 
 			// Validate user password
-			if pair[1] != userPass {
+			if sentPass != userPass {
 				http.Error(w, "Not authorized", http.StatusUnauthorized)
 				return
 			}
